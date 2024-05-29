@@ -25,7 +25,8 @@ export class SearchModal extends SuggestModal<Chunk> {
 
         // filter out duplicate file_paths from the suggestions
         // since we cannot open deep links anyway.
-        let suggestions = (await queryNoteChunks(queryDetails)).filter((value, index, self) => {
+        let chunks = await queryNoteChunks(queryDetails);
+        let suggestions = chunks.filter((value: Chunk, index, self: Chunk[]) => {
             return self.findIndex(v => v.file_path === value.file_path) === index;
         })
 
