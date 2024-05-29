@@ -2,7 +2,7 @@ import os
 import shutil
 
 if __name__ == "__main__":
-    vault_path = input("Enter the Obsidian vault path: ")
+    vault_path = "/Users/lunalux/Library/Mobile Documents/iCloud~md~obsidian/Documents/Lux Vault" #input("Enter the Obsidian vault path: ")
     print("Vault path: " + vault_path)
     if not os.path.exists(vault_path):
         print("Vault path does not exist.")

@@ -8,7 +8,7 @@ export class MessageModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-        contentEl.setText(this.message);
+        contentEl.innerHTML = this.message;
     }
 
     onClose() {

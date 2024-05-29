@@ -14,6 +14,13 @@ $ npm install
 $ npm run prod
 ```
 
+configure database for server
+
+```python
+requests.post("http://localhost:3003/configure",json={"pluginPath":"/Users/lunalux/Library/Mobile Documents/iCloud~md~obsi
+dian/Documents/Lux Vault/.obsidian/plugins/semantic_search","model":"Xenova/all-MiniLM-L6-v2"})
+```
+
 ## Usage
 
 Currently there's seven commands in the plugin interface: Info, Unindexed Files, Seach, Embed File, Reset Index, Embed Vault, Update Index:

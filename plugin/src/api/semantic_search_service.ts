@@ -23,7 +23,7 @@ export async function embeddingsInfo(vectorStore: VectorStore) {
 }
 
 interface EmbeddedFile {
-    file_name: string;
+    file_path: string;
 }
 
 /**
@@ -42,7 +42,7 @@ export async function embeddedFiles(vectorStore: VectorStore) {
             body: JSON.stringify(vectorStore)
         });
         const responseJSON = await response.json();
-        const fileNames = responseJSON.map((file: EmbeddedFile) => file.file_name);
+        const fileNames = responseJSON.map((file: EmbeddedFile) => file.file_path);
         return fileNames;
     } catch (error) {
         console.error('Error getting embedded files: ', error, vectorStore);
@@ -72,6 +72,21 @@ export async function resetEmbeddingIndex({ vaultPath, pluginPath }: VectorStore
         return true;
     } catch (error) {
         console.error('Error resetting embedding index:', error);
+    }
+}
+
+
+export async function deleteEmbeddings(files_paths: string[], embeddingParams: EmbeddingParams){
+    try {
+        return await fetch(new URL('http://localhost:3003/delete_files_embedding'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ filePaths: files_paths, ...embeddingParams })
+        });
+    } catch (error) {
+        console.error('Error deleting embeddings:', error);
     }
 }
 

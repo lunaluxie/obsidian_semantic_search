@@ -27,9 +27,9 @@ export class SearchModal extends SuggestModal<Chunk> {
     }
 
     renderSuggestion({ file_name, file_path, text_chunk }: Chunk, el: HTMLElement) {
-        el.createEl('h4', { text: file_name, cls: 'suggestion-file-name' });
-        el.createEl('h6', { text: file_path, cls: 'suggestion-file-path' });
-        el.createEl('div', { text: text_chunk, cls: 'suggestion-text-chunk' });
+        el.createEl('span', { text: file_name, cls: 'omnisearch-result__title' });
+        el.createEl('span', { text: file_path, cls: 'omnisearch-result__folder-path' });
+        el.createEl('div', { text: text_chunk, cls: 'omnisearch-result__body' });
     }
 
     onChooseSuggestion({ file_path }: Chunk, evt: MouseEvent | KeyboardEvent) {

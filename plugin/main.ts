@@ -13,6 +13,7 @@ import {
     updateEmbeddingIndex,
     embeddingsInfo,
     embeddedFiles,
+    deleteEmbeddings,
     resetEmbeddingIndex
 } from 'src/api/semantic_search_service';
 
@@ -27,10 +28,9 @@ export default class SemanticSearchPlugin extends Plugin {
 
         await serverAvailable().then(async (available: boolean) => {
             if (!available) {
-                new MessageModal(
-                    this.app,
+                new Notice(
                     'The backend server is not running. Please start the server and reload the plugin.'
-                ).open();
+                );
             } else {
                 if (this.settings.embeddingModel) {
                     const vectorStore = {
@@ -107,13 +107,15 @@ export default class SemanticSearchPlugin extends Plugin {
                     pluginPath: this.getBasePath() + PLUGIN_PATH
                 };
 
+
                 const fileNames = await embeddedFiles(vectoreStore);
+
                 const markdownFiles: TFile[] = this.app.vault.getMarkdownFiles();
-                const filteredMarkdownFiles = markdownFiles.filter(file => !fileNames.includes(file.name));
-                const filteredFileNames = filteredMarkdownFiles.map(file => file.name);
+                const filteredMarkdownFiles = markdownFiles.filter(file => !fileNames.includes(file.path));
+                const filteredFileNames = filteredMarkdownFiles.map(file => file.path);
                 new MessageModal(
                     this.app,
-                    filteredFileNames.join('\n')
+                    filteredFileNames.map(fn => "<p>"+fn+"</p>").join('\n')
                 ).open();
             }
         });
@@ -143,6 +145,9 @@ export default class SemanticSearchPlugin extends Plugin {
                         console.error('Error embedding file:', error);
                     }
                 }
+                else {
+                    new Notice("Cannot embed file of type " + currentFile?.extension + ". Please open a markdown file.")
+                }
             }
         });
 
@@ -162,6 +167,98 @@ export default class SemanticSearchPlugin extends Plugin {
                     console.error('Error updating embedding index:', error, vectoreStore);
                 }
             }
+        });
+
+        this.addCommand({
+            'id': 'stale-embeddings',
+            'name': 'Stale Embeddings',
+            callback: async () => {
+                const markdownFiles: TFile[] = this.app.vault.getMarkdownFiles();
+                const vectoreStore = {
+                    model: this.settings.embeddingModel || 'none',
+                    vaultPath: this.getBasePath(),
+                    pluginPath: this.getBasePath() + PLUGIN_PATH
+                };
+
+                const indexedFileNames: string[] = await embeddedFiles(vectoreStore);
+
+                const vaultMarkdownPaths = markdownFiles.map(file => file.path)
+
+                const staleFiles = indexedFileNames.filter(path => !vaultMarkdownPaths.includes(path));
+
+                new MessageModal(this.app,
+                    staleFiles.map(fn => "<p>" + fn + "</p>").join('\n')
+                ).open();
+            },
+        })
+
+        this.addCommand({
+            id: 'embed-changed-files',
+            name: 'Embed Changed Files',
+            callback: async () => {
+                const markdownFiles: TFile[] = this.app.vault.getMarkdownFiles();
+
+                let changedFiles = markdownFiles.filter(file => file.stat.mtime > this.settings.lastUpdated);
+
+                const fileCount = changedFiles.length;
+                console.log('Embedding ', fileCount, ' files.');
+                const embeddingParams = {
+                    model: this.settings.embeddingModel || 'none',
+                    vaultPath: this.getBasePath(),
+                    pluginPath: this.getBasePath() + PLUGIN_PATH,
+                    chunkSize: this.settings.chunkSize
+                };
+
+                // todo embed files as batch and batch update index afterwards
+                // for now we have to embed files one by one to automatically update index
+                let embeddedCount = 0;
+                for (let i = 0; i < changedFiles.length; i++) {
+                    let currentFile = changedFiles[i];
+                    if (currentFile && currentFile.extension === 'md') {
+                       try {
+                            let fileDetails = {
+                               fileName: currentFile.name,
+                               filePath: currentFile.path,
+                            };
+
+                            console.log("Embedding file: ", fileDetails.filePath)
+                            await embedFile(fileDetails, embeddingParams);
+                            embeddedCount += 1;
+                        } catch (error) {
+                            console.error('Error embedding file:', error);
+                        }
+                    }
+                    else {
+                        console.log("Cannot embed file of type " + currentFile?.extension + ". Please open a markdown file.")
+                    }
+                }
+
+                console.log('Removing stale files from index');
+                const vectoreStore = {
+                    model: this.settings.embeddingModel || 'none',
+                    vaultPath: this.getBasePath(),
+                    pluginPath: this.getBasePath() + PLUGIN_PATH
+                };
+
+                const indexedFileNames: string[] = await embeddedFiles(vectoreStore);
+
+                const vaultMarkdownPaths = markdownFiles.map(file => file.path)
+
+                const staleFiles = indexedFileNames.filter(path => !vaultMarkdownPaths.includes(path));
+
+                console.log('Stale files: ', staleFiles)
+
+                try {
+                    await deleteEmbeddings(staleFiles, embeddingParams);
+                } catch (error) {
+                    new Notice('Error deleting embeddings:', error);
+                }
+
+                this.settings.lastUpdated = Date.now();
+                await this.saveSettings();
+
+                new Notice('Embedded ' + embeddedCount + ' files. out of ' + fileCount + ' files.');
+            },
         });
 
         this.addCommand({
@@ -202,6 +299,9 @@ export default class SemanticSearchPlugin extends Plugin {
                     embeddedCount += batch.length;
                     this.embedStatusBar.setText(`Embedded file ${embeddedCount} of ${fileCount}`);
                 }
+
+                this.settings.lastUpdated = Date.now();
+                await this.saveSettings();
 
                 new Notice('Vault embedding complete. Update VSS Index.');
             }

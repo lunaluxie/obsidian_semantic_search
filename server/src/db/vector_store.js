@@ -9,7 +9,7 @@ import {
   createVirtualTable, insertFileEmbeddingsIntoVSS,
   insertEmbeddingsIntoVSS, deleteFileFromVss, deleteFromVss,
   deleteFileFromNoteChunks, embeddingsQuery,
-  deleteFilesFromNoteChunks, insertMultipleNoteChunks
+  deleteFilesFromNoteChunks, insertMultipleNoteChunks, deleteFilesFromVss
 } from './sql.js'
 import path from 'path'
 
@@ -60,34 +60,40 @@ export class VectorStore {
 
   async embedFile (chunkSize, chunkOverlap, model, fileName, filePath, vaultPath) {
     try {
-      this.deleteFileEmbedding(fileName)
+      this.deleteFileEmbedding(filePath)
       await this.createEmbedding(chunkSize, chunkOverlap, model, fileName, filePath, vaultPath)
-      this.updateFileIndex(fileName)
+      this.updateFileIndex(filePath)
     } catch (error) {
-      throw new Error('Error VectorStore.embed_file: ', error)
+      console.log('Error VectorStore.embed_file: ', error)
+      // throw new Error('Error VectorStore.embed_file: ', error)
     }
   }
 
   fileNames () {
     try {
-      const fileNames = this.db.prepare('SELECT distinct file_name FROM note_chunks').all()
+      const fileNames = this.db.prepare('SELECT distinct file_path FROM note_chunks').all()
       return fileNames
     } catch (error) {
       throw new Error('Error VectorStore.fileNames: ', error)
     }
   }
 
-  deleteFilesEmbedding (fileNames) {
-    const deleteFilesFromNoteChunksSQL = deleteFilesFromNoteChunks(fileNames)
-    this.db.prepare(deleteFilesFromNoteChunksSQL).run(...fileNames)
+  deleteFilesEmbedding (filePaths) {
+    this.wrapInTransaction(() => {
+      const deleteFilesFromVssSQL = deleteFilesFromVss(filePaths)
+      this.db.prepare(deleteFilesFromVssSQL).run(...filePaths)
+
+      const deleteFilesFromNoteChunksSQL = deleteFilesFromNoteChunks(filePaths)
+      this.db.prepare(deleteFilesFromNoteChunksSQL).run(...filePaths)
+    })
   }
 
   async embedBatch (chunkSize, chunkOverlap, model, files, vaultPath) {
     this.db.pragma('synchronous = OFF')
     this.db.pragma('journal_mode = MEMORY')
 
-    const fileNames = files.map((file) => { return file.fileName })
-    this.deleteFilesEmbedding(fileNames)
+    const filePaths = files.map((file) => { return file.filePath })
+    this.deleteFilesEmbedding(filePaths)
 
     await files.forEach(async (file) => {
       await this.createEmbedding(chunkSize, chunkOverlap, model, file.fileName, file.filePath, vaultPath)
@@ -138,8 +144,8 @@ export class VectorStore {
     })
   }
 
-  updateFileIndex (fileName) {
-    this.db.prepare(insertFileEmbeddingsIntoVSS).run(fileName)
+  updateFileIndex (filePath) {
+    this.db.prepare(insertFileEmbeddingsIntoVSS).run(filePath)
   }
 
   reset () {
@@ -147,10 +153,10 @@ export class VectorStore {
     this.db.prepare('DELETE FROM note_chunks').run()
   }
 
-  deleteFileEmbedding (fileName) {
+  deleteFileEmbedding (filePath) {
     this.wrapInTransaction(() => {
-      this.db.prepare(deleteFileFromVss).run(fileName)
-      this.db.prepare(deleteFileFromNoteChunks).run(fileName)
+      this.db.prepare(deleteFileFromVss).run(filePath)
+      this.db.prepare(deleteFileFromNoteChunks).run(filePath)
       console.log('deleteFileEmbedding - vss size: ', this.size())
     })
   }

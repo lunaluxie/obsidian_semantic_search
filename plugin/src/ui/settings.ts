@@ -11,6 +11,7 @@ export interface SemanticSearchSettings {
 	chunkSize: number;
 	resultCount: number;
     batchSize: number;
+    lastUpdated: number;
 }
 
 export const DEFAULT_SETTINGS: SemanticSearchSettings = {
@@ -18,7 +19,8 @@ export const DEFAULT_SETTINGS: SemanticSearchSettings = {
     apiKey: '',
     chunkSize: 500,
     resultCount: 5,
-    batchSize: 20
+    batchSize: 20,
+    lastUpdated: 0,
 };
 
 export class SemanticSearchSettingTab extends PluginSettingTab {
@@ -122,5 +124,9 @@ export class SemanticSearchSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 })
             );
+
+        new Setting(containerEl)
+            .setName('Last Updated')
+            .setDesc('Last time the embeddings were updated: ' + new Date(this.plugin.settings.lastUpdated).toLocaleString());
     }
 }

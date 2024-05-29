@@ -70,6 +70,22 @@ app.post('/embed_batch', async (req, res) => {
   }
 })
 
+app.post('/delete_files_embedding', async (req, res) => {
+  const vectDb = new VectorStore(buildDbPath(req.body))
+  try {
+    console.log("deleting files embeddings for ")
+    console.log(req.body.filePaths)
+    await vectDb.deleteFilesEmbedding(
+      req.body.filePaths
+    )
+
+    res.sendStatus(200)
+  } catch (error) {
+    console.error(error)
+    res.sendStatus(500)
+  }
+})
+
 app.post('/embedded_files', async (req, res) => {
   try {
     const fileNames = new VectorStore(buildDbPath(req.body)).fileNames()
